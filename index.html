@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Focus Dash v9.0 - True Calendar</title>
+    <title>Focus Dash v9.2 - Analytics</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <style>
@@ -33,7 +33,6 @@
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         
-        /* 月曆專用 Scrollbar 隱藏 */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -49,7 +48,6 @@
     <div id="cal-overlay" class="overlay hidden items-start justify-start overflow-y-auto no-scrollbar pt-20">
         <button onclick="closeCalendar()" class="fixed top-10 right-10 text-4xl opacity-50 hover:opacity-100 transition z-50">✕</button>
         <div class="w-full max-w-7xl mx-auto flex flex-col gap-6">
-            
             <header class="flex justify-between items-center bg-white/5 p-6 rounded-3xl border border-white/10">
                 <h2 class="text-4xl font-bold tracking-widest uppercase flex items-center gap-4">
                     <span id="cal-month-year" class="solid-accent">MAY 2026</span>
@@ -59,7 +57,6 @@
                     <button onclick="changeMonth(1)" class="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-xl transition">→</button>
                 </div>
             </header>
-
             <div class="bg-black/40 rounded-3xl border border-white/10 overflow-hidden shadow-2xl">
                 <div class="grid grid-cols-7 bg-white/5 border-b border-white/10">
                     <div class="p-3 text-center text-xs font-bold tracking-widest opacity-50 uppercase text-red-400">Sun</div>
@@ -70,9 +67,34 @@
                     <div class="p-3 text-center text-xs font-bold tracking-widest opacity-50 uppercase">Fri</div>
                     <div class="p-3 text-center text-xs font-bold tracking-widest opacity-50 uppercase">Sat</div>
                 </div>
-                <div id="calendar-grid" class="grid grid-cols-7 gap-[1px] bg-white/10">
-                    </div>
+                <div id="calendar-grid" class="grid grid-cols-7 gap-[1px] bg-white/10"></div>
             </div>
+        </div>
+    </div>
+
+    <div id="stats-overlay" class="overlay hidden">
+        <button onclick="closeStats()" class="absolute top-10 right-10 text-4xl opacity-50 hover:opacity-100 transition z-50">✕</button>
+        <div class="w-full max-w-5xl glass p-12 flex flex-col gap-10 border border-emerald-500/20">
+            <h2 class="text-4xl font-bold tracking-[0.3em] uppercase text-emerald-400 text-center">Focus Analytics</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-black/30 p-8 rounded-2xl border border-white/5 text-center flex flex-col justify-center items-center">
+                    <p class="text-[10px] font-bold tracking-widest opacity-50 uppercase mb-4">Today</p>
+                    <p id="stat-day" class="text-5xl font-black mono text-white">0M</p>
+                </div>
+                <div class="bg-black/30 p-8 rounded-2xl border border-white/5 text-center flex flex-col justify-center items-center">
+                    <p class="text-[10px] font-bold tracking-widest opacity-50 uppercase mb-4">Last 7 Days</p>
+                    <p id="stat-week" class="text-5xl font-black mono text-emerald-200">0M</p>
+                </div>
+                <div class="bg-black/30 p-8 rounded-2xl border border-white/5 text-center flex flex-col justify-center items-center">
+                    <p class="text-[10px] font-bold tracking-widest opacity-50 uppercase mb-4">This Month</p>
+                    <p id="stat-month" class="text-5xl font-black mono text-emerald-300">0M</p>
+                </div>
+                <div class="bg-black/30 p-8 rounded-2xl border border-emerald-500/30 text-center flex flex-col justify-center items-center shadow-[0_0_30px_rgba(16,185,129,0.1)]">
+                    <p class="text-[10px] font-bold tracking-widest text-emerald-400 uppercase mb-4">This Year</p>
+                    <p id="stat-year" class="text-5xl font-black mono text-emerald-500">0M</p>
+                </div>
+            </div>
+            <p class="text-center text-xs opacity-40 italic mt-4">只有成功完成嘅專注任務先會計入記錄。中途放棄不獲計算。</p>
         </div>
     </div>
 
@@ -154,7 +176,10 @@
                     <h1 class="text-7xl md:text-8xl font-black italic tracking-tighter">FOCUS<span id="theme-dot" class="text-emerald-400">.</span></h1>
                 </div>
                 <div class="text-right flex flex-col items-end gap-2">
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-3">
+                        <button onclick="openStats()" class="bg-white/10 hover:bg-emerald-500/20 text-emerald-100 hover:text-emerald-400 px-4 py-2 rounded-lg text-xs font-bold tracking-widest uppercase transition flex items-center gap-2 border border-white/5">
+                            📊 Analytics
+                        </button>
                         <button onclick="openCalendar()" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-xs font-bold tracking-widest uppercase transition flex items-center gap-2 border border-white/5">
                             📅 Mission Calendar
                         </button>
@@ -189,6 +214,9 @@
         let currentPetName = localStorage.getItem('vibe_pet_name') || 'Rookie';
         let timers = JSON.parse(localStorage.getItem('vibe_timers')) || [];
         let currentTheme = localStorage.getItem('vibe_theme') || 'midnight';
+        // 🌟 新增：專注記錄 Log
+        let focusLog = JSON.parse(localStorage.getItem('vibe_focus_log')) || [];
+        
         let maxId = null;
         let isMaxPomo = false;
         let activePomoQuote = "Stay focused. Hack the system.";
@@ -204,12 +232,13 @@
             localStorage.setItem('vibe_pet', currentPet);
             localStorage.setItem('vibe_pet_name', currentPetName);
             localStorage.setItem('vibe_theme', currentTheme);
+            localStorage.setItem('vibe_focus_log', JSON.stringify(focusLog));
             updateUI();
             renderTimers();
             if(!document.getElementById('cal-overlay').classList.contains('hidden')) renderCalendar();
         }
 
-        // --- HACKER POMODORO (Anti-Cheat & Dynamic Bounty) ---
+        // --- HACKER POMODORO ---
         let pomoTime = 25 * 60;
         let pomoActive = false;
         let pomoInterval;
@@ -310,7 +339,12 @@
                     
                     if (pomoTime <= 0) {
                         clearInterval(pomoInterval);
+                        
+                        // 🌟 成功完成：派錢 + 記錄時間
                         balance += currentBounty; 
+                        let completedMins = parseInt(minsInput.value) || 25;
+                        focusLog.push({ timestamp: Date.now(), duration: completedMins });
+                        
                         document.getElementById('balance-display').innerText = `$${balance}`;
                         alert(`Mission Accomplished! +$${currentBounty} Crypto Bounty Added!`);
                         
@@ -346,7 +380,7 @@
 
         function resetPomo() {
             if(!isPomoStarted) return; 
-            if(confirm("確定要放棄任務？（未完成將無法獲得任何賞金）")) {
+            if(confirm("確定要放棄任務？（未完成將無法獲得任何賞金，亦不計入 Analytics）")) {
                 clearInterval(pomoInterval);
                 pomoActive = false;
                 isPomoStarted = false;
@@ -385,6 +419,102 @@
         
         updatePomoInitialTime();
 
+        // --- 🌟 ANALYTICS LOGIC ---
+        function formatMins(totalMins) {
+            if(totalMins === 0) return "0M";
+            let h = Math.floor(totalMins / 60);
+            let m = totalMins % 60;
+            return h > 0 ? `${h}H ${m}M` : `${m}M`;
+        }
+
+        function openStats() {
+            document.getElementById('stats-overlay').classList.remove('hidden');
+            let now = new Date();
+            let dSum=0, wSum=0, mSum=0, ySum=0;
+            
+            focusLog.forEach(log => {
+                let logDate = new Date(log.timestamp);
+                let diffDays = (now - logDate) / (1000 * 60 * 60 * 24);
+                
+                if(logDate.toDateString() === now.toDateString()) dSum += log.duration;
+                if(diffDays <= 7) wSum += log.duration;
+                if(logDate.getMonth() === now.getMonth() && logDate.getFullYear() === now.getFullYear()) mSum += log.duration;
+                if(logDate.getFullYear() === now.getFullYear()) ySum += log.duration;
+            });
+
+            document.getElementById('stat-day').innerText = formatMins(dSum);
+            document.getElementById('stat-week').innerText = formatMins(wSum);
+            document.getElementById('stat-month').innerText = formatMins(mSum);
+            document.getElementById('stat-year').innerText = formatMins(ySum);
+        }
+
+        function closeStats() {
+            document.getElementById('stats-overlay').classList.add('hidden');
+        }
+
+        // --- CALENDAR LOGIC ---
+        let calCurrentDate = new Date();
+
+        function openCalendar() {
+            document.getElementById('cal-overlay').classList.remove('hidden');
+            renderCalendar();
+        }
+
+        function closeCalendar() {
+            document.getElementById('cal-overlay').classList.add('hidden');
+        }
+
+        function changeMonth(dir) {
+            calCurrentDate.setMonth(calCurrentDate.getMonth() + dir);
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            const year = calCurrentDate.getFullYear();
+            const month = calCurrentDate.getMonth();
+            const monthNames = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
+            document.getElementById('cal-month-year').innerText = `${monthNames[month]} ${year}`;
+
+            const firstDayIndex = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = ''; 
+
+            for (let i = 0; i < firstDayIndex; i++) {
+                grid.innerHTML += `<div class="bg-black/40 min-h-[100px] p-2 border-r border-b border-white/5"></div>`;
+            }
+
+            const today = new Date();
+            for (let day = 1; day <= daysInMonth; day++) {
+                const currentDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const eventsOnThisDay = timers.filter(t => t.target.startsWith(currentDateStr));
+                
+                let isToday = (day === today.getDate() && month === today.getMonth() && year === today.getFullYear());
+                let dateStyle = isToday ? "bg-emerald-500 text-slate-900 rounded-full w-7 h-7 flex items-center justify-center shadow-lg" : "text-white/60";
+
+                let eventsHTML = eventsOnThisDay.map(e => `
+                    <div class="mt-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[9px] px-2 py-1 rounded-md truncate font-bold uppercase tracking-wider">
+                        • ${e.name}
+                    </div>
+                `).join('');
+
+                grid.innerHTML += `
+                    <div class="bg-slate-900/60 min-h-[120px] p-2 border-r border-b border-white/5 hover:bg-white/5 transition flex flex-col">
+                        <div class="text-xs font-bold mb-2 ${dateStyle}">${day}</div>
+                        <div class="flex-1 flex flex-col gap-1 overflow-y-auto no-scrollbar">
+                            ${eventsHTML}
+                        </div>
+                    </div>
+                `;
+            }
+
+            const totalCells = firstDayIndex + daysInMonth;
+            const remainingCells = (7 - (totalCells % 7)) % 7;
+            for (let i = 0; i < remainingCells; i++) {
+                grid.innerHTML += `<div class="bg-black/40 min-h-[100px] p-2 border-r border-b border-white/5"></div>`;
+            }
+        }
+
         // --- SHOP & THEME ---
         function buyTheme(id, price) {
             if (unlockedItems.includes(id)) { setTheme(id); return; }
@@ -416,7 +546,7 @@
             setTheme(currentTheme);
         }
 
-        // --- TIMERS (Add / Edit / Remove) ---
+        // --- TIMERS ---
         function handleAction() {
             const name = document.getElementById('new-name').value;
             const date = document.getElementById('new-date').value;
@@ -483,7 +613,6 @@
                             <div class="text-center w-1/4"><span id="s-${t.id}" class="solid-accent">00</span><p class="text-[10px] mt-2 text-emerald-400 opacity-80 tracking-widest">SEC</p></div>
                         </div>
                     </div>
-                    
                     <div class="border-t border-white/10 pt-4 mt-2">
                         <p class="text-xs italic opacity-80 text-emerald-50">"${t.quote}"</p>
                     </div>
@@ -541,83 +670,25 @@
             isMaxPomo = false;
         }
 
-        // --- 🌟 REAL CALENDAR LOGIC (v9.0) ---
-        let calCurrentDate = new Date();
-
-        function openCalendar() {
-            document.getElementById('cal-overlay').classList.remove('hidden');
-            renderCalendar();
-        }
-
-        function closeCalendar() {
-            document.getElementById('cal-overlay').classList.add('hidden');
-        }
-
-        function changeMonth(dir) {
-            calCurrentDate.setMonth(calCurrentDate.getMonth() + dir);
-            renderCalendar();
-        }
-
-        function renderCalendar() {
-            const year = calCurrentDate.getFullYear();
-            const month = calCurrentDate.getMonth();
-            
-            const monthNames = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
-            document.getElementById('cal-month-year').innerText = `${monthNames[month]} ${year}`;
-
-            const firstDayIndex = new Date(year, month, 1).getDay();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            
-            const grid = document.getElementById('calendar-grid');
-            grid.innerHTML = ''; // 清空
-
-            // 填充前一個月嘅空白格
-            for (let i = 0; i < firstDayIndex; i++) {
-                grid.innerHTML += `<div class="bg-black/40 min-h-[100px] p-2"></div>`;
-            }
-
-            // 填充真正嘅日子
-            const today = new Date();
-            for (let day = 1; day <= daysInMonth; day++) {
-                const currentDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                
-                // 搵下有冇任務喺今日
-                const eventsOnThisDay = timers.filter(t => t.target.startsWith(currentDateStr));
-                
-                let isToday = (day === today.getDate() && month === today.getMonth() && year === today.getFullYear());
-                let dateStyle = isToday ? "bg-emerald-500 text-slate-900 rounded-full w-7 h-7 flex items-center justify-center shadow-lg" : "text-white/60";
-
-                let eventsHTML = eventsOnThisDay.map(e => `
-                    <div class="mt-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[9px] px-2 py-1 rounded-md truncate font-bold uppercase tracking-wider">
-                        • ${e.name}
-                    </div>
-                `).join('');
-
-                grid.innerHTML += `
-                    <div class="bg-slate-900/60 min-h-[120px] p-2 border-r border-b border-white/5 hover:bg-white/5 transition flex flex-col">
-                        <div class="text-xs font-bold mb-2 ${dateStyle}">${day}</div>
-                        <div class="flex-1 flex flex-col gap-1 overflow-y-auto no-scrollbar">
-                            ${eventsHTML}
-                        </div>
-                    </div>
-                `;
-            }
-
-            // 補齊最後一行嘅空白格
-            const totalCells = firstDayIndex + daysInMonth;
-            const remainingCells = (7 - (totalCells % 7)) % 7;
-            for (let i = 0; i < remainingCells; i++) {
-                grid.innerHTML += `<div class="bg-black/40 min-h-[100px] p-2 border-r border-b border-white/5"></div>`;
-            }
-        }
-
-        // --- GLOBAL NETWORK CLOCK ---
+        // --- GLOBAL NETWORK CLOCK (Auto Clean) ---
         setInterval(() => {
             const now = new Date();
             document.getElementById('live-clock').innerText = now.toTimeString().split(' ')[0];
             
+            let expiredIds = []; 
+
             timers.forEach(t => {
                 const diff = new Date(t.target) - now;
+                
+                if (diff <= 0) {
+                    expiredIds.push(t.id);
+                    if (maxId === t.id && !isMaxPomo) {
+                        closeMax();
+                        alert(`MISSION ACCOMPLISHED: [${t.name}] 目標已到達，記錄將自動清除。`);
+                    }
+                    return;
+                }
+
                 const d = Math.max(0, Math.floor(diff/86400000));
                 const h = Math.max(0, Math.floor((diff%86400000)/3600000));
                 const m = Math.max(0, Math.floor((diff%3600000)/60000));
@@ -637,6 +708,12 @@
                     document.getElementById('max-s').innerText = String(s).padStart(2,'0');
                 }
             });
+
+            if (expiredIds.length > 0) {
+                timers = timers.filter(t => !expiredIds.includes(t.id));
+                save();
+            }
+
         }, 1000);
 
         save(); // Init
