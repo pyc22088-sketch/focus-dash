@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus Dash v9.0 - True Calendar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root { --accent: #10b981; --bg: #020617; --card: rgba(30, 41, 59, 0.4); }
+        /* Themes */
+        body.theme-midnight { --accent: #10b981; --bg: #0f172a; --card: rgba(15, 23, 42, 0.7); }
+        body.theme-forest { --accent: #34d399; --bg: #064e3b; --card: rgba(6, 78, 59, 0.8); }
+        body.theme-cyber { --accent: #f472b6; --bg: #2e1065; --card: rgba(88, 28, 135, 0.6); }
+
+        body { background-color: var(--bg); color: #f8fafc; font-family: 'Space Grotesk', sans-serif; transition: background-color 0.5s ease; }
+        .glass { background: var(--card); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1.5rem; }
+        .mono { font-family: 'Share Tech Mono', monospace; }
+        
+        .solid-accent { color: var(--accent); font-weight: bold; }
+        .pomo-active { border: 2px solid var(--accent); background: rgba(16, 185, 129, 0.05); }
+        .pomo-failed { border: 2px solid #ef4444; background: rgba(239, 68, 68, 0.05); }
+        
+        .overlay { position: fixed; inset: 0; z-index: 50; background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(20px); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; transition: opacity 0.3s ease; }
+        
+        @keyframes gentle-pulse {
+            0% { box-shadow: inset 0 0 0px rgba(16, 185, 129, 0); }
+            50% { box-shadow: inset 0 0 50px rgba(16, 185, 129, 0.1); }
+            100% { box-shadow: inset 0 0 0px rgba(16, 185, 129, 0); }
+        }
+        .pomo-max-active { animation: gentle-pulse 4s infinite; }
+        
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        
+        /* 月曆專用 Scrollbar 隱藏 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="theme-midnight min-h-screen p-4 lg:p-8">
+
+    <div id="max-overlay" class="overlay hidden">
+        <button onclick="closeMax()" class="absolute top-10 right-10 text-4xl opacity-50 hover:opacity-100 transition z-50">✕</button>
+        <div id="max-content" class="text-center w-full max-w-6xl flex flex-col items-center justify-center relative z-10"></div>
+        <div id="pomo-bg-effect" class="absolute inset-0 pointer-events-none"></div>
+    </div>
+
+    <div id="cal-overlay" class="overlay hidden items-start justify-start overflow-y-auto no-scrollbar pt-20">
+        <button onclick="closeCalendar()" class="fixed top-10 right-10 text-4xl opacity-50 hover:opacity-100 transition z-50">✕</button>
+        <div class="w-full max-w-7xl mx-auto flex flex-col gap-6">
+            
+            <header class="flex justify-between items-center bg-white/5 p-6 rounded-3xl border border-white/10">
+                <h2 class="text-4xl font-bold tracking-widest uppercase flex items-center gap-4">
+                    <span id="cal-month-year" class="solid-accent">MAY 2026</span>
+                </h2>
+                <div class="flex gap-4">
+                    <button onclick="changeMonth(-1)" class="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-xl transition">←</button>
+                    <button onclick="changeMonth(1)" class="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-xl transition">→</button>
+                </div>
+            </header>
+
+            <div class="bg-black/40 rounded-3xl border border-white/10 overflow-hidden shadow-2xl">
+                <div class="grid grid-cols-7 bg-white/5 border-b border-white/10">
+                    <div class="p-3 text-center text-xs font-bold tracking-widest opacity-50 uppercase text-red-400">Sun</div>
+                    <div class="p-3 text-center text-xs font-bold tracking-widest opacity-50 uppercase">Mon</div>
+                    <div class="p-3 text-center text-xs font-bold tracking-widest opacity-50 uppercase">Tue</div>
+                    <div class="p-3 text-center text-xs font-bold tracking-widest opacity-50 uppercase">Wed</div>
+                    <div class="p-3 text-center text-xs font-bold tracking-widest opacity-50 uppercase">Thu</div>
+                    <div class="p-3 text-center text-xs font-bold tracking-widest opacity-50 uppercase">Fri</div>
+                    <div class="p-3 text-center text-xs font-bold tracking-widest opacity-50 uppercase">Sat</div>
+                </div>
+                <div id="calendar-grid" class="grid grid-cols-7 gap-[1px] bg-white/10">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-0">
+        
+        <aside class="lg:col-span-4 flex flex-col gap-6">
+            <div class="glass p-4 shadow-xl">
+                <div class="flex justify-between items-center mb-2 px-1">
+                    <span class="text-xs font-bold tracking-[0.2em] text-emerald-400">LO-FI STATION</span>
+                    <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                </div>
+                <div class="rounded-xl overflow-hidden bg-black aspect-video border border-white/10">
+                    <iframe width="100%" height="100%" src="https://www.youtube.com/embed/jfKfPfyJRdk" title="Lofi Girl" frameborder="0" allow="autoplay; clipboard-write; encrypted-media" allowfullscreen></iframe>
+                </div>
+            </div>
+
+            <div class="glass p-6 border-b-4 border-yellow-500 flex justify-between items-center">
+                <div>
+                    <span class="text-xs font-bold tracking-widest opacity-60 block mb-1">CRYPTO WALLET</span>
+                    <span class="text-4xl font-bold text-yellow-400 mono" id="balance-display">$0</span>
+                </div>
+                <div class="flex items-center gap-4 p-3 bg-white/5 rounded-xl text-right border border-white/10">
+                    <div>
+                        <p class="text-[10px] font-bold text-emerald-400 tracking-wider">COMPANION</p>
+                        <p id="pet-name" class="text-sm font-medium opacity-90">Rookie</p>
+                    </div>
+                    <div id="pet-display" class="text-4xl animate-bounce">👤</div>
+                </div>
+            </div>
+
+            <div id="pomo-panel" class="glass p-8 text-center transition-all border-l-4 border-transparent relative">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-[10px] font-bold opacity-60 tracking-[0.3em] uppercase">Bounty Mission</h3>
+                    <button onclick="maximizePomo()" class="text-[10px] font-bold opacity-40 hover:opacity-100 hover:text-emerald-400 tracking-widest transition px-2 py-1 bg-white/5 rounded">MAX</button>
+                </div>
+
+                <div id="time-setting-wrapper" class="flex justify-between items-center bg-black/30 border border-white/10 rounded-xl px-4 py-2 mb-4 transition-opacity">
+                    <span class="text-xs opacity-60 uppercase tracking-widest text-emerald-400 font-bold">DURATION</span>
+                    <div class="flex items-center gap-1">
+                        <input id="pomo-mins-input" type="number" min="1" max="180" value="25" onchange="updatePomoInitialTime()" class="bg-transparent w-10 text-right text-lg font-bold mono outline-none text-white focus:text-emerald-400 transition">
+                        <span class="text-xs opacity-50 font-bold uppercase tracking-widest mt-1">MIN</span>
+                    </div>
+                </div>
+                
+                <div class="bg-black/50 p-4 rounded-xl mb-4 border border-white/10 min-h-[70px] flex items-center justify-center flex-col gap-2">
+                    <p id="story-text" class="text-sm opacity-90 italic text-emerald-200 leading-relaxed">
+                        「防火牆已鎖定。系統正在監控你嘅視窗。離開頁面將會被判定為任務失敗！」
+                    </p>
+                </div>
+
+                <input id="pomo-quote-input" type="text" placeholder="打句專注金句警醒自己..." class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-emerald-500 transition mb-6 text-center text-emerald-50">
+
+                <div id="pomo-display" class="text-7xl font-bold mono solid-accent mb-6">25:00</div>
+                
+                <div class="flex gap-3">
+                    <button id="pomo-btn" onclick="togglePomo()" class="flex-1 bg-emerald-500 text-slate-900 font-black py-4 rounded-xl active:scale-95 transition uppercase tracking-tighter text-lg shadow-lg">
+                        START MISSION
+                    </button>
+                    <button onclick="resetPomo()" class="px-4 py-4 bg-white/10 hover:bg-white/20 rounded-xl transition text-xs font-bold uppercase opacity-80" title="Abort Mission">
+                        ABORT
+                    </button>
+                </div>
+            </div>
+
+            <div class="glass p-6">
+                <h3 class="text-xs font-bold mb-4 tracking-[0.2em] uppercase opacity-60 text-center">Black Market</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="buyTheme('forest', 500)" class="bg-white/5 p-3 rounded-xl text-xs border border-white/10 hover:border-emerald-500 transition">🌲 Forest <span class="block text-yellow-400 mt-1 font-mono">$500</span></button>
+                    <button onclick="buyTheme('cyber', 1500)" class="bg-white/5 p-3 rounded-xl text-xs border border-white/10 hover:border-pink-500 transition">🌆 Cyber <span class="block text-yellow-400 mt-1 font-mono">$1500</span></button>
+                    <button onclick="buyPet('🤖', 'Cyber Bot', 1000)" class="bg-white/5 p-3 rounded-xl text-xs border border-white/10 hover:border-blue-500 transition">🤖 Bot <span class="block text-yellow-400 mt-1 font-mono">$1000</span></button>
+                    <button onclick="buyPet('🐉', 'Data Dragon', 3000)" class="bg-white/5 p-3 rounded-xl text-xs border border-white/10 hover:border-red-500 transition">🐉 Dragon <span class="block text-yellow-400 mt-1 font-mono">$3000</span></button>
+                </div>
+            </div>
+        </aside>
+
+        <main class="lg:col-span-8 flex flex-col gap-8">
+            <header class="flex justify-between items-end px-2 pt-2">
+                <div>
+                    <h1 class="text-7xl md:text-8xl font-black italic tracking-tighter">FOCUS<span id="theme-dot" class="text-emerald-400">.</span></h1>
+                </div>
+                <div class="text-right flex flex-col items-end gap-2">
+                    <div class="flex items-center gap-4">
+                        <button onclick="openCalendar()" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-xs font-bold tracking-widest uppercase transition flex items-center gap-2 border border-white/5">
+                            📅 Mission Calendar
+                        </button>
+                    </div>
+                    <p id="live-clock" class="text-3xl font-mono opacity-90 text-emerald-100 mt-2">00:00:00</p>
+                </div>
+            </header>
+
+            <div class="glass p-6 flex flex-col gap-4">
+                <span id="form-title" class="text-xs font-bold tracking-widest opacity-80 uppercase text-emerald-400">New Target</span>
+                <div class="flex flex-wrap gap-4">
+                    <input id="new-name" type="text" placeholder="Mission Name (e.g. ICT Test)" class="bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-base flex-1 outline-none focus:border-emerald-500 transition">
+                    <input id="new-date" type="date" class="bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-base text-white outline-none focus:border-emerald-500 transition">
+                </div>
+                <div class="flex flex-wrap gap-4">
+                    <input id="new-quote" type="text" placeholder="打句嘢鼓勵吓自己..." class="bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-base flex-1 outline-none focus:border-emerald-500 transition">
+                    <input type="hidden" id="edit-id">
+                    <button id="main-btn" onclick="handleAction()" class="bg-emerald-500 text-slate-900 px-8 py-3 rounded-xl font-bold text-base hover:bg-emerald-400 transition w-full md:w-auto shadow-lg">DEPLOY</button>
+                    <button id="cancel-btn" onclick="resetForm()" class="hidden px-6 py-3 bg-white/10 rounded-xl text-xs hover:bg-white/20 transition font-bold">CANCEL</button>
+                </div>
+            </div>
+
+            <div id="timers-container" class="grid grid-cols-1 xl:grid-cols-2 gap-6"></div>
+        </main>
+    </div>
+
+    <script>
+        // --- DATA STATE ---
+        let balance = parseInt(localStorage.getItem('vibe_balance')) || 0;
+        let unlockedItems = JSON.parse(localStorage.getItem('vibe_unlocked')) || ['midnight'];
+        let currentPet = localStorage.getItem('vibe_pet') || '👤';
+        let currentPetName = localStorage.getItem('vibe_pet_name') || 'Rookie';
+        let timers = JSON.parse(localStorage.getItem('vibe_timers')) || [];
+        let currentTheme = localStorage.getItem('vibe_theme') || 'midnight';
+        let maxId = null;
+        let isMaxPomo = false;
+        let activePomoQuote = "Stay focused. Hack the system.";
+
+        let userMins = parseInt(localStorage.getItem('vibe_pomo_mins')) || 25;
+        document.getElementById('pomo-mins-input').value = userMins;
+        document.getElementById('pomo-quote-input').value = localStorage.getItem('vibe_pomo_quote') || "";
+
+        function save() {
+            localStorage.setItem('vibe_balance', balance);
+            localStorage.setItem('vibe_unlocked', JSON.stringify(unlockedItems));
+            localStorage.setItem('vibe_timers', JSON.stringify(timers));
+            localStorage.setItem('vibe_pet', currentPet);
+            localStorage.setItem('vibe_pet_name', currentPetName);
+            localStorage.setItem('vibe_theme', currentTheme);
+            updateUI();
+            renderTimers();
+            if(!document.getElementById('cal-overlay').classList.contains('hidden')) renderCalendar();
+        }
+
+        // --- HACKER POMODORO (Anti-Cheat & Dynamic Bounty) ---
+        let pomoTime = 25 * 60;
+        let pomoActive = false;
+        let pomoInterval;
+        let isPomoStarted = false; 
+        let currentBounty = 25 * 60; 
+
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden && pomoActive) triggerFail();
+        });
+
+        function triggerFail() {
+            clearInterval(pomoInterval);
+            pomoActive = false;
+            isPomoStarted = false;
+
+            const minsInput = document.getElementById('pomo-mins-input');
+            const timeWrapper = document.getElementById('time-setting-wrapper');
+            const panel = document.getElementById('pomo-panel');
+            const story = document.getElementById('story-text');
+            const quoteInput = document.getElementById('pomo-quote-input');
+            const bgEffect = document.getElementById('pomo-bg-effect');
+
+            minsInput.value = 25;
+            minsInput.disabled = false;
+            timeWrapper.classList.remove('opacity-30', 'pointer-events-none');
+            
+            pomoTime = 25 * 60;
+            currentBounty = 25 * 60;
+            
+            document.getElementById('pomo-btn').innerText = "RESTART MISSION";
+            panel.classList.remove('pomo-active');
+            panel.classList.add('pomo-failed');
+            panel.style.borderLeftColor = "#ef4444"; 
+            quoteInput.classList.remove('hidden');
+            
+            story.innerHTML = `「<span class="text-red-500 font-bold">⚠️ 任務失敗！偵測到你離開咗防線。</span>系統已重置為 25 分鐘標準任務。」`;
+            bgEffect.classList.remove('pomo-max-active');
+            
+            updatePomoDisplay();
+            if(isMaxPomo) closeMax();
+
+            alert("⚠️ SYSTEM BREACH DETECTED ⚠️\n\n你離開咗頁面！專注任務失敗，本次賞金已被取消。系統已重置為 25 分鐘。");
+        }
+
+        function updatePomoInitialTime() {
+            if (!isPomoStarted) {
+                let mins = parseInt(document.getElementById('pomo-mins-input').value);
+                if (isNaN(mins) || mins < 1) mins = 1;
+                if (mins > 180) mins = 180; 
+                
+                document.getElementById('pomo-mins-input').value = mins;
+                pomoTime = mins * 60;
+                currentBounty = mins * 60; 
+                
+                document.getElementById('story-text').innerText = `「防火牆已鎖定。系統正在監控你嘅視窗。離開頁面將會被判定為任務失敗！」`;
+                updatePomoDisplay();
+            }
+        }
+
+        function togglePomo() {
+            const btn = document.getElementById('pomo-btn');
+            const panel = document.getElementById('pomo-panel');
+            const story = document.getElementById('story-text');
+            const quoteInput = document.getElementById('pomo-quote-input');
+            const bgEffect = document.getElementById('pomo-bg-effect');
+            const timeWrapper = document.getElementById('time-setting-wrapper');
+            const minsInput = document.getElementById('pomo-mins-input');
+
+            panel.classList.remove('pomo-failed');
+            pomoActive = !pomoActive;
+
+            if (pomoActive) {
+                if (!isPomoStarted) {
+                    isPomoStarted = true;
+                    minsInput.disabled = true;
+                    timeWrapper.classList.add('opacity-30', 'pointer-events-none');
+                }
+
+                const userQuote = quoteInput.value.trim();
+                activePomoQuote = userQuote || "Stay focused. Hack the system.";
+                localStorage.setItem('vibe_pomo_quote', userQuote);
+                
+                quoteInput.classList.add('hidden');
+                btn.innerText = `HACKING... (BOUNTY: $${currentBounty})`;
+                panel.classList.add('pomo-active');
+                panel.style.borderLeftColor = "var(--accent)";
+                
+                story.innerHTML = `「防線已啟動。切勿離開此頁面！」<br><br><span class="text-white text-lg font-bold">"${activePomoQuote}"</span>`;
+                
+                if (isMaxPomo) {
+                    bgEffect.classList.add('pomo-max-active');
+                    maximizePomo();
+                }
+
+                pomoInterval = setInterval(() => {
+                    pomoTime--;
+                    updatePomoDisplay();
+                    
+                    if (pomoTime <= 0) {
+                        clearInterval(pomoInterval);
+                        balance += currentBounty; 
+                        document.getElementById('balance-display').innerText = `$${balance}`;
+                        alert(`Mission Accomplished! +$${currentBounty} Crypto Bounty Added!`);
+                        
+                        pomoActive = false; 
+                        isPomoStarted = false;
+                        minsInput.value = 25;
+                        minsInput.disabled = false;
+                        timeWrapper.classList.remove('opacity-30', 'pointer-events-none');
+                        pomoTime = 25 * 60;
+                        currentBounty = 25 * 60;
+                        
+                        quoteInput.classList.remove('hidden'); 
+                        story.innerText = `「成功破解！賞金已入賬。系統已重置為 25 分鐘準備下一輪任務。」`;
+                        btn.innerText = "START NEXT MISSION";
+                        panel.classList.remove('pomo-active');
+                        bgEffect.classList.remove('pomo-max-active');
+                        if(isMaxPomo) document.getElementById('max-pomo-btn').innerText = "START NEXT MISSION";
+                        
+                        save();
+                        updatePomoDisplay();
+                    }
+                }, 1000);
+            } else {
+                clearInterval(pomoInterval);
+                btn.innerText = "RESUME HACK";
+                panel.classList.remove('pomo-active');
+                panel.style.borderLeftColor = "transparent";
+                story.innerHTML = `「⚠️ 系統暫停。請盡快返回！」<br><br><span class="text-white text-lg font-bold opacity-50">"${activePomoQuote}"</span>`;
+                bgEffect.classList.remove('pomo-max-active');
+                if(isMaxPomo) document.getElementById('max-pomo-btn').innerText = "RESUME HACK";
+            }
+        }
+
+        function resetPomo() {
+            if(!isPomoStarted) return; 
+            if(confirm("確定要放棄任務？（未完成將無法獲得任何賞金）")) {
+                clearInterval(pomoInterval);
+                pomoActive = false;
+                isPomoStarted = false;
+                
+                const minsInput = document.getElementById('pomo-mins-input');
+                const timeWrapper = document.getElementById('time-setting-wrapper');
+                const panel = document.getElementById('pomo-panel');
+                
+                minsInput.value = 25;
+                minsInput.disabled = false;
+                timeWrapper.classList.remove('opacity-30', 'pointer-events-none');
+                pomoTime = 25 * 60;
+                currentBounty = 25 * 60;
+                
+                document.getElementById('pomo-btn').innerText = "START MISSION";
+                panel.classList.remove('pomo-active', 'pomo-failed');
+                panel.style.borderLeftColor = "transparent";
+                document.getElementById('pomo-quote-input').classList.remove('hidden');
+                document.getElementById('story-text').innerText = `「任務已取消。系統已自動重置為 25 分鐘標準任務。」`;
+                document.getElementById('pomo-bg-effect').classList.remove('pomo-max-active');
+                
+                updatePomoDisplay();
+                if(isMaxPomo) closeMax();
+            }
+        }
+
+        function updatePomoDisplay() {
+            const m = Math.floor(pomoTime / 60);
+            const s = pomoTime % 60;
+            const timeStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            document.getElementById('pomo-display').innerText = timeStr;
+            if (isMaxPomo && document.getElementById('max-pomo-time')) {
+                document.getElementById('max-pomo-time').innerText = timeStr;
+            }
+        }
+        
+        updatePomoInitialTime();
+
+        // --- SHOP & THEME ---
+        function buyTheme(id, price) {
+            if (unlockedItems.includes(id)) { setTheme(id); return; }
+            if (balance >= price) { balance -= price; unlockedItems.push(id); setTheme(id); save(); } 
+            else { alert("Insufficient Crypto! Complete missions to earn bounty."); }
+        }
+
+        function buyPet(emoji, name, price) {
+            if (balance >= price) { balance -= price; currentPet = emoji; currentPetName = name; save(); } 
+            else { alert("Insufficient Crypto!"); }
+        }
+
+        function setTheme(t) {
+            currentTheme = t;
+            document.body.className = `theme-${t}`;
+            const colors = { midnight: '#10b981', forest: '#34d399', cyber: '#f472b6' };
+            document.getElementById('theme-dot').style.color = colors[t];
+            document.querySelectorAll('button').forEach(b => {
+                if(b.innerText.includes('START') || b.innerText.includes('HACKING') || b.innerText.includes('DEPLOY') || b.innerText.includes('UPDATE') || b.innerText.includes('RESUME') || b.innerText.includes('RESTART')) {
+                    b.style.backgroundColor = colors[t];
+                }
+            });
+        }
+
+        function updateUI() {
+            document.getElementById('balance-display').innerText = `$${balance}`;
+            document.getElementById('pet-display').innerText = currentPet;
+            document.getElementById('pet-name').innerText = currentPetName;
+            setTheme(currentTheme);
+        }
+
+        // --- TIMERS (Add / Edit / Remove) ---
+        function handleAction() {
+            const name = document.getElementById('new-name').value;
+            const date = document.getElementById('new-date').value;
+            const quote = document.getElementById('new-quote').value;
+            const id = document.getElementById('edit-id').value;
+            
+            if(!name || !date) return alert("Please input mission name and date.");
+            const finalQuote = quote.trim() === "" ? "Keep pushing forward." : quote;
+
+            if (id) {
+                const idx = timers.findIndex(t => t.id == id);
+                timers[idx] = { ...timers[idx], name, target: `${date}T00:00:00`, quote: finalQuote };
+            } else {
+                timers.push({ id: Date.now(), name, target: `${date}T00:00:00`, quote: finalQuote });
+            }
+            save(); resetForm();
+        }
+
+        function editTimer(id) {
+            const t = timers.find(x => x.id == id);
+            document.getElementById('new-name').value = t.name;
+            document.getElementById('new-date').value = t.target.split('T')[0];
+            document.getElementById('new-quote').value = t.quote === "Keep pushing forward." ? "" : t.quote;
+            document.getElementById('edit-id').value = t.id;
+            
+            document.getElementById('form-title').innerText = "EDITING MISSION";
+            document.getElementById('main-btn').innerText = "UPDATE";
+            document.getElementById('cancel-btn').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function resetForm() {
+            document.getElementById('new-name').value = '';
+            document.getElementById('new-date').value = '';
+            document.getElementById('new-quote').value = '';
+            document.getElementById('edit-id').value = '';
+            document.getElementById('form-title').innerText = "New Target";
+            document.getElementById('main-btn').innerText = "DEPLOY";
+            document.getElementById('cancel-btn').classList.add('hidden');
+        }
+
+        function deleteTimer(id) {
+            if(confirm("Confirm abort mission?")) { timers = timers.filter(x => x.id !== id); save(); }
+        }
+
+        function renderTimers() {
+            const container = document.getElementById('timers-container');
+            container.innerHTML = timers.map(t => `
+                <div class="glass p-8 relative flex flex-col justify-between border-l-4 border-transparent hover:border-emerald-500/50 transition-colors duration-300 min-h-[240px]">
+                    <div>
+                        <div class="flex justify-between items-start mb-6">
+                            <h3 class="text-sm font-bold tracking-[0.2em] uppercase text-emerald-100 opacity-90">${t.name}</h3>
+                            <div class="flex gap-4 text-[10px] font-bold opacity-40 tracking-widest">
+                                <button onclick="maximize(${t.id})" class="hover:text-emerald-400 hover:opacity-100 transition px-1">MAX</button>
+                                <button onclick="editTimer(${t.id})" class="hover:text-white hover:opacity-100 transition px-1">EDIT</button>
+                                <button onclick="deleteTimer(${t.id})" class="hover:text-red-500 hover:opacity-100 transition px-1">DEL</button>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-between items-baseline font-bold text-5xl md:text-6xl mono mb-4 text-white">
+                            <div class="text-center w-1/4"><span id="d-${t.id}">00</span><p class="text-[10px] mt-2 opacity-50 tracking-widest">DAYS</p></div>
+                            <div class="text-center w-1/4"><span id="h-${t.id}">00</span><p class="text-[10px] mt-2 opacity-50 tracking-widest">HRS</p></div>
+                            <div class="text-center w-1/4"><span id="m-${t.id}">00</span><p class="text-[10px] mt-2 opacity-50 tracking-widest">MIN</p></div>
+                            <div class="text-center w-1/4"><span id="s-${t.id}" class="solid-accent">00</span><p class="text-[10px] mt-2 text-emerald-400 opacity-80 tracking-widest">SEC</p></div>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t border-white/10 pt-4 mt-2">
+                        <p class="text-xs italic opacity-80 text-emerald-50">"${t.quote}"</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- 🌟 MAXIMIZE MODE ---
+        function maximize(id) {
+            const t = timers.find(x => x.id === id);
+            document.getElementById('max-overlay').classList.remove('hidden');
+            document.getElementById('max-content').innerHTML = `
+                <h2 class="text-4xl md:text-6xl font-bold tracking-[0.4em] mb-12 opacity-60 uppercase text-emerald-300">${t.name}</h2>
+                <div class="flex justify-center gap-8 md:gap-20 items-baseline mb-12 text-white">
+                    <div class="text-center"><p id="max-d" class="text-[8rem] md:text-[14rem] font-black leading-none mono">00</p><p class="tracking-[1em] opacity-40 mt-6 text-xl">DAYS</p></div>
+                    <div class="text-center"><p id="max-h" class="text-[8rem] md:text-[14rem] font-black leading-none mono">00</p><p class="tracking-[1em] opacity-40 mt-6 text-xl">HOURS</p></div>
+                </div>
+                <div class="flex justify-center gap-12 items-baseline mb-16 text-white">
+                     <div class="text-center"><p id="max-m" class="text-7xl md:text-9xl font-bold mono opacity-80">00</p><p class="tracking-[0.5em] opacity-40 mt-4 text-sm">MIN</p></div>
+                     <span class="text-6xl opacity-30">:</span>
+                     <div class="text-center"><p id="max-s" class="text-7xl md:text-9xl font-bold mono solid-accent">00</p><p class="tracking-[0.5em] text-emerald-400 opacity-80 mt-4 text-sm">SEC</p></div>
+                </div>
+                <p class="text-2xl md:text-3xl italic font-light opacity-90 text-emerald-100 max-w-4xl px-8">"${t.quote}"</p>
+            `;
+            maxId = id;
+            isMaxPomo = false;
+        }
+
+        function maximizePomo() {
+            document.getElementById('max-overlay').classList.remove('hidden');
+            const m = Math.floor(pomoTime / 60);
+            const s = pomoTime % 60;
+            const btnText = pomoActive ? "PAUSE HACK" : "RESUME HACK";
+            const currentQuote = document.getElementById('pomo-quote-input').value.trim() || activePomoQuote;
+            
+            document.getElementById('max-content').innerHTML = `
+                <h2 class="text-2xl md:text-4xl font-bold tracking-[0.5em] mb-16 opacity-50 uppercase text-emerald-400">SYSTEM OVERRIDE IN PROGRESS</h2>
+                <div class="text-center mb-16">
+                    <p id="max-pomo-time" class="text-[12rem] md:text-[20rem] font-black leading-none mono solid-accent">${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}</p>
+                </div>
+                <div class="flex gap-6 justify-center mb-16">
+                    <button id="max-pomo-btn" onclick="togglePomo()" class="bg-emerald-500 text-slate-900 px-12 py-5 rounded-2xl font-black text-2xl hover:bg-emerald-400 transition shadow-xl uppercase tracking-widest">${btnText}</button>
+                    <button onclick="closeMax()" class="px-10 py-5 bg-white/10 hover:bg-white/20 rounded-2xl transition text-xl font-bold uppercase tracking-widest text-white">MINIMIZE</button>
+                </div>
+                <p class="text-2xl md:text-3xl italic font-light opacity-90 text-emerald-100 max-w-4xl px-8">"${currentQuote}"</p>
+            `;
+            isMaxPomo = true;
+            if(pomoActive) document.getElementById('pomo-bg-effect').classList.add('pomo-max-active');
+        }
+
+        function closeMax() { 
+            document.getElementById('max-overlay').classList.add('hidden'); 
+            document.getElementById('pomo-bg-effect').classList.remove('pomo-max-active');
+            maxId = null; 
+            isMaxPomo = false;
+        }
+
+        // --- 🌟 REAL CALENDAR LOGIC (v9.0) ---
+        let calCurrentDate = new Date();
+
+        function openCalendar() {
+            document.getElementById('cal-overlay').classList.remove('hidden');
+            renderCalendar();
+        }
+
+        function closeCalendar() {
+            document.getElementById('cal-overlay').classList.add('hidden');
+        }
+
+        function changeMonth(dir) {
+            calCurrentDate.setMonth(calCurrentDate.getMonth() + dir);
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            const year = calCurrentDate.getFullYear();
+            const month = calCurrentDate.getMonth();
+            
+            const monthNames = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
+            document.getElementById('cal-month-year').innerText = `${monthNames[month]} ${year}`;
+
+            const firstDayIndex = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = ''; // 清空
+
+            // 填充前一個月嘅空白格
+            for (let i = 0; i < firstDayIndex; i++) {
+                grid.innerHTML += `<div class="bg-black/40 min-h-[100px] p-2"></div>`;
+            }
+
+            // 填充真正嘅日子
+            const today = new Date();
+            for (let day = 1; day <= daysInMonth; day++) {
+                const currentDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                
+                // 搵下有冇任務喺今日
+                const eventsOnThisDay = timers.filter(t => t.target.startsWith(currentDateStr));
+                
+                let isToday = (day === today.getDate() && month === today.getMonth() && year === today.getFullYear());
+                let dateStyle = isToday ? "bg-emerald-500 text-slate-900 rounded-full w-7 h-7 flex items-center justify-center shadow-lg" : "text-white/60";
+
+                let eventsHTML = eventsOnThisDay.map(e => `
+                    <div class="mt-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[9px] px-2 py-1 rounded-md truncate font-bold uppercase tracking-wider">
+                        • ${e.name}
+                    </div>
+                `).join('');
+
+                grid.innerHTML += `
+                    <div class="bg-slate-900/60 min-h-[120px] p-2 border-r border-b border-white/5 hover:bg-white/5 transition flex flex-col">
+                        <div class="text-xs font-bold mb-2 ${dateStyle}">${day}</div>
+                        <div class="flex-1 flex flex-col gap-1 overflow-y-auto no-scrollbar">
+                            ${eventsHTML}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 補齊最後一行嘅空白格
+            const totalCells = firstDayIndex + daysInMonth;
+            const remainingCells = (7 - (totalCells % 7)) % 7;
+            for (let i = 0; i < remainingCells; i++) {
+                grid.innerHTML += `<div class="bg-black/40 min-h-[100px] p-2 border-r border-b border-white/5"></div>`;
+            }
+        }
+
+        // --- GLOBAL NETWORK CLOCK ---
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('live-clock').innerText = now.toTimeString().split(' ')[0];
+            
+            timers.forEach(t => {
+                const diff = new Date(t.target) - now;
+                const d = Math.max(0, Math.floor(diff/86400000));
+                const h = Math.max(0, Math.floor((diff%86400000)/3600000));
+                const m = Math.max(0, Math.floor((diff%3600000)/60000));
+                const s = Math.max(0, Math.floor((diff%60000)/1000));
+                
+                if(document.getElementById(`d-${t.id}`)) {
+                    document.getElementById(`d-${t.id}`).innerText = String(d).padStart(2,'0');
+                    document.getElementById(`h-${t.id}`).innerText = String(h).padStart(2,'0');
+                    document.getElementById(`m-${t.id}`).innerText = String(m).padStart(2,'0');
+                    document.getElementById(`s-${t.id}`).innerText = String(s).padStart(2,'0');
+                }
+
+                if (maxId === t.id && !isMaxPomo) {
+                    document.getElementById('max-d').innerText = String(d).padStart(2,'0');
+                    document.getElementById('max-h').innerText = String(h).padStart(2,'0');
+                    document.getElementById('max-m').innerText = String(m).padStart(2,'0');
+                    document.getElementById('max-s').innerText = String(s).padStart(2,'0');
+                }
+            });
+        }, 1000);
+
+        save(); // Init
+    </script>
+</body>
+</html>
